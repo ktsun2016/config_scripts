@@ -1,0 +1,91 @@
+#!/usr/bin/expect
+set run_file_1 run_sdwan.xml
+set file_1 [open $run_file_1 w]
+
+
+for {set j 1} {$j < 51} {incr j} {
+	if {$j%4 == 0} { 
+		set wansla "Vioce"
+	} elseif {$j%4 == 1} {
+		set wansla "Business-Normal"
+	} elseif {$j%4 == 2} {
+		set wansla "Business-High"
+	} elseif {$j%4 == 3} {
+		set wansla "Business-Critical"
+	}
+
+        puts $file_1 "
+<fvTenant dn=\"uni/tn-coke$j\" name=\"coke$j\" >
+   <fvCtx name=\"vrf$j\" >
+      <fvRsCtxToSDWanVpn  tDn=\"uni/tn-common/sdwanvpncont/sdwanvpnentry-1\" />
+   </fvCtx>
+"
+for {set i 1} {$i < 21} {incr i} {
+        puts $file_1 "
+   <vzFilter name=\"Filter_c$j\_$i\" >
+      <vzEntry  etherT=\"ip\" name=\"filter_c$j\_$i\"  />
+   </vzFilter>
+   <vzBrCP intent=\"install\" name=\"contract_c$j\_$i\">
+      <vzSubj name=\"subj_c$j\_$i\" prio=\"level1\" targetDscp=\"CS2\">
+         <vzRsSubjFiltAtt action=\"permit\"  tnVzFilterName=\"Filter_c$j\_$i\" />
+         <vzRsSdwanPol  tDn=\"uni/tn-common/sdwanpolcont/sdwanslapol-$wansla\" />
+      </vzSubj>
+   </vzBrCP>
+"
+}
+        puts $file_1 "
+
+   <l3extOut enforceRtctrl=\"export\" name=\"L3out_coke$j\" >
+      <l3extRsL3DomAtt tDn=\"uni/l3dom-Domain_102_L3out\" />
+      <l3extRsEctx tnFvCtxName=\"vrf$j\" />
+      <l3extLNodeP name=\"L3out_coke_nodeProfile\" >
+         <l3extRsNodeL3OutAtt rtrId=\"2.2.$j.2\" rtrIdLoopBack=\"yes\" tDn=\"topology/pod-1/node-102\" />
+         <l3extLIfP name=\"L3out_coke_interfaceProfile\" >
+            <l3extRsPathL3OutAtt addr=\"4.4.$j.1/24\"  encap=\"vlan-[expr 100+ $j]\" encapScope=\"local\" ifInstT=\"sub-interface\"  tDn=\"topology/pod-1/paths-102/pathep-\[eth1/1]\"  />
+         </l3extLIfP>
+      </l3extLNodeP>
+      <l3extInstP name=\"L3out_EPG_coke$j\" >
+"
+for {set i 1} {$i < 21} {incr i} {
+
+        puts $file_1 "
+         <fvRsCons intent=\"install\" tnVzBrCPName=\"contract_c$j\_$i\" />
+
+"
+}
+        puts $file_1 "
+      </l3extInstP>
+   </l3extOut>
+
+"
+for {set i 1} {$i < 21} {incr i} {
+
+        puts $file_1 "
+   <fvBD  name=\"bd$j\_$i\"  type=\"regular\" unicastRoute=\"yes\" unkMacUcastAct=\"proxy\" unkMcastAct=\"flood\" v6unkMcastAct=\"flood\" vmac=\"not-applicable\">
+      <fvSubnet annotation=\"\" ctrl=\"\" descr=\"\" ip=\"100.$j.$i.1/24\"  preferred=\"no\" scope=\"private\" virtual=\"no\" />
+      <fvRsCtx annotation=\"\" tnFvCtxName=\"vrf$j\" />
+   </fvBD>
+"
+}
+        puts $file_1 "
+<fvAp name=\"ap$j\" >
+"
+for {set i 1} {$i < 21} {incr i} {
+        puts $file_1 "
+      <fvAEPg name=\"epg$j\_$i\" >
+         <fvRsProv  tnVzBrCPName=\"contract_c$j\_$i\" />
+         <fvRsPathAtt encap=\"vlan-[expr 600+($j\-1)\*20+$i]\"  tDn=\"topology/pod-1/paths-103/pathep-\[eth1/47]\" />
+         <fvSubnet  ip=\"100.$j.$i.1/24\"  scope=\"private\" virtual=\"no\" />
+         <fvRsDomAtt switchingMode=\"native\" tDn=\"uni/phys-Domain_103_ixia\" untagged=\"no\" />
+         <fvRsBd  tnFvBDName=\"bd$j\_$i\" />
+      </fvAEPg>
+"
+}
+
+ puts $file_1 "
+   </fvAp>
+</fvTenant>
+"
+
+}
+
